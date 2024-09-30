@@ -3,11 +3,11 @@
 
 /* WiFi settings */
 // WiFi name
-const char* ssid = "FRITZ!Box 7530 UR"; 
+const char* ssid = "YourWiFIName"; 
 //WiFi password
-const char* password = "73905551489688924355"; 
+const char* password = "YourPassword"; 
 // Computer's IP Address
-const char* mqtt_server = "192.168.178.20";
+const char* mqtt_server = "YourIP";
 
 // Establishing a TCP client which communicates over TCP/IP
 // with other devices (MQTT broker) in the network
