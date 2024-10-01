@@ -13,6 +13,10 @@
 #include <Wire.h>
 // MQTT Protocoll
 #include <PubSubClient.h>
+// Http Protocol
+#include <HTTPClient.h>
+// JSON for data exchange
+#include <ArduinoJson.h>
 
 
 // Define DHT type and pin
@@ -30,11 +34,11 @@ LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 
 /* WiFi settings */
 // WiFi name
-const char* ssid = "YourRouter"; 
+const char* ssid = "FRITZ!Box 7530 UR"; 
 //WiFi password
-const char* password = "YourWifiPassword"; 
+const char* password = "73905551489688924355"; 
 // Computer's IP Address
-const char* mqtt_server = "YourIP";
+const char* mqtt_server = "192.168.178.20";
 // Establishing a TCP client which communicates over TCP/IP
 // with other devices (MQTT broker) in the network
 WiFiClient espClient;
@@ -50,8 +54,26 @@ char msg[50];
 // Counter for messages
 int value = 0;
 
-// Initialize the server on standard port
-WebServer server(80); 
+// OpenWeatherMap API Settings
+const char* apiKey = "deb259b2cc2333095adce96af7326b8a";
+const char* city = "Berlin";
+const char* countryCode = "DE";
+
+// THE DEFAULT TIMER IS SET TO 10 SECONDS FOR TESTING PURPOSES
+// For a final application, check the API call limits per hour/minute to avoid getting blocked/banned
+unsigned long lastTime = 0;
+// Timer set to 10 minutes (600000)
+//unsigned long timerDelay = 600000;
+// Set timer to 30 seconds (10000)
+unsigned long timerDelay = 30000;
+
+// JSON object
+String jsonBuffer;
+
+// Global sensor variables
+float temperature = 0; 
+float humidity = 0; 
+
 
 void setup() {
   // Initialize I2C and set SDA and SCL pins 
@@ -112,11 +134,12 @@ void reconnect() {
 
   //Check MQTT Connection Status.
   while (!client.connected()) {
+    String clientIdPublisher = "ESP32Publisher-" + String(WiFi.macAddress());
     Serial.print("Verbindung zum MQTT-Broker...");
     // Connection to broker
     // "ESP32Publisher" is the client ID
     // It identifies the device (ESP32)  to the broker.
-    if (client.connect("ESP32Publisher")) {
+    if (client.connect(clientIdPublisher.c_str())) {
       Serial.println("verbunden");
     } else {
       // Error handling
@@ -124,6 +147,130 @@ void reconnect() {
       Serial.print(client.state());
       delay(5000);
     }
+  }
+}
+
+void sendTemperatureData() {
+  // Reading sensor values
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+    
+  // Error handling: Sensor's not working
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Fehler beim Lesen des Sensors!");
+    return;
+  }
+
+  // Publishing temperature
+  // The formatted string is stored in the msg character array.
+  snprintf(msg, 50, "Temperatur: %.2f°C", temperature);
+  Serial.print("Veröffentliche Nachricht: ");
+  Serial.println(msg);
+  // The temperature value is published to the MQTT topic
+  client.publish("Umgebung/Temperatur", msg);
+
+  // Publishing humidity
+  snprintf(msg, 50, "Luftfeuchtigkeit: %.2f%%", humidity);
+  Serial.print("Veröffentliche Nachricht: ");
+  Serial.println(msg);
+  client.publish("Umgebung/Luftfeuchtigkeit", msg);
+
+}
+
+String httpGETRequest(const char* serverName) {
+  // Client for sending HTTP requesta
+  HTTPClient http;
+
+  // Sarting the HTTP Connection.
+  // Your server name or URL 
+  http.begin(serverName);
+
+  // Send HTTP GET request
+  // It returns an HTTP code showing the status 
+  // of the request (e.g 200 for success):
+  int httpResponseCode = http.GET();
+
+  // Default response as empty object
+  String payload = "{}"; 
+  // If the request was successful the answer (JSON object) 
+  // will be saved as a string
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Stopping the HTTP connection and freeing  resources
+  http.end();
+
+  return payload;  
+}
+
+void sendWeatherData() {
+  // Send an HTTP GET request
+  if ((millis() - lastTime) > timerDelay) {
+    // Checking WiFI connection 
+    if(WiFi.status()== WL_CONNECTED) {
+      String serverPath = String("http://api.openweathermap.org/data/2.5/weather?q=") + city + "," + countryCode + "&APPID=" + apiKey;
+
+      // The httpGETRequest() function makes a request to OpenWeatherMap and it retrieves
+      // a string with a JSON object that contains all the information about the weather 
+      //for your city.
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      Serial.println(jsonBuffer);
+
+      // Create a DynamicJsonDocument to hold the parsed JSON
+      DynamicJsonDocument doc(2048); // Adjusting size
+
+      // Deserialize the JSON document
+      DeserializationError error = deserializeJson(doc, jsonBuffer);
+
+
+      // Error handling
+      if (error) {
+        Serial.print("Failed to parse JSON: ");
+        Serial.println(error.c_str());
+        return;
+      }
+
+      // Access the parsed JSON data
+      JsonObject myObject = doc.as<JsonObject>();
+
+      
+      Serial.print("JSON object = ");
+      Serial.println(myObject);
+
+      // Collect weather data
+      float temperatureW = myObject["main"]["temp"].as<float>();  
+      float pressure = myObject["main"]["pressure"].as<float>();  
+      float humidityW = myObject["main"]["humidity"].as<float>();  
+      float windSpeed = myObject["wind"]["speed"].as<float>();  
+
+
+      // Build a JSON string to publish via MQTT
+      float tempC = temperatureW - 273.15;
+      String mqttMessage = "{\"temperature\": ";
+      mqttMessage += String(tempC, 2);
+      mqttMessage += ", \"pressure\": ";
+      mqttMessage += String(pressure, 2);
+      mqttMessage += ", \"humidity\": ";
+      mqttMessage += String(humidityW, 2);
+      mqttMessage += ", \"windSpeed\": ";
+      mqttMessage += String(windSpeed, 2);
+      mqttMessage += "}";
+
+      // Publish the JSON string to the MQTT topic "Umgebung/Wetter"
+      client.publish("Umgebung/Wetter", mqttMessage.c_str());
+      Serial.print("Published to MQTT: ");
+      Serial.println(mqttMessage);
+
+    } else {
+      Serial.println("WiFi Disconnected");
+    }
+    lastTime = millis();
   }
 }
 
@@ -139,34 +286,11 @@ void loop() {
 
   long now = millis();
 
-  // Each 10 seconds
+  // Send sensor data each 10 seconds
   if (now - lastMsg > 10000) {  
     lastMsg = now;
-
-    // Reading sensor values
-    float temperature = dht.readTemperature();
-    float humidity = dht.readHumidity();
+    sendTemperatureData();
     
-    // Error handling: Sensor's not working
-    if (isnan(temperature) || isnan(humidity)) {
-      Serial.println("Fehler beim Lesen des Sensors!");
-      return;
-    }
-
-    // Publishing temperature
-    // The formatted string is stored in the msg character array.
-    snprintf(msg, 50, "Temperatur: %.2f°C", temperature);
-    Serial.print("Veröffentliche Nachricht: ");
-    Serial.println(msg);
-    // The temperature value is published to the MQTT topic
-    client.publish("Umgebung/Temperatur", msg);
-
-    // Publishing humidity
-    snprintf(msg, 50, "Luftfeuchtigkeit: %.2f%%", humidity);
-    Serial.print("Veröffentliche Nachricht: ");
-    Serial.println(msg);
-    client.publish("Umgebung/Luftfeuchtigkeit", msg);
-
     // Display on LCD
     lcd.setCursor(0, 0);
     lcd.print("Temp: ");
@@ -179,5 +303,6 @@ void loop() {
     lcd.print(" ");
   }
 
-
+  // Send weather data from the server
+  sendWeatherData();
 }
