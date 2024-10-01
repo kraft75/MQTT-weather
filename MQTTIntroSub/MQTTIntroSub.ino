@@ -3,11 +3,11 @@
 
 /* WiFi settings */
 // WiFi name
-const char* ssid = "YourWiFIName"; 
+const char* ssid = "FRITZ!Box 7530 UR"; 
 //WiFi password
-const char* password = "YourPassword"; 
+const char* password = "73905551489688924355"; 
 // Computer's IP Address
-const char* mqtt_server = "YourIP";
+const char* mqtt_server = "192.168.178.20";
 
 // Establishing a TCP client which communicates over TCP/IP
 // with other devices (MQTT broker) in the network
@@ -82,12 +82,14 @@ void setup_wifi() {
 void reconnect() {
   // Establish connection between subscriber and broker
   while (!client.connected()) {
+    String clientIdSubscriber = "ESP32Subscriber-" + String(WiFi.macAddress());
     Serial.print("Verbindung zum MQTT-Broker...");
     // Identifying the device (ESP32) to the broker.
-    if (client.connect("ESP32Subscriber")) {
+    if (client.connect(clientIdSubscriber.c_str())) {
       Serial.println("verbunden");
       client.subscribe("Umgebung/Temperatur");
       client.subscribe("Umgebung/Luftfeuchtigkeit");
+      client.subscribe("Umgebung/Wetter");
     } else {
       Serial.print("Verbindungsfehler, rc=");
       Serial.print(client.state());
