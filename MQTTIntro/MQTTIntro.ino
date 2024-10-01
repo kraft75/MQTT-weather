@@ -34,11 +34,11 @@ LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 
 /* WiFi settings */
 // WiFi name
-const char* ssid = "FRITZ!Box 7530 UR"; 
+const char* ssid = "YourWifiName"; 
 //WiFi password
-const char* password = "73905551489688924355"; 
+const char* password = "Your WiFiPWD"; 
 // Computer's IP Address
-const char* mqtt_server = "192.168.178.20";
+const char* mqtt_server = "YourIPAddress";
 // Establishing a TCP client which communicates over TCP/IP
 // with other devices (MQTT broker) in the network
 WiFiClient espClient;
@@ -55,8 +55,8 @@ char msg[50];
 int value = 0;
 
 // OpenWeatherMap API Settings
-const char* apiKey = "deb259b2cc2333095adce96af7326b8a";
-const char* city = "Berlin";
+const char* apiKey = "YourKey";
+const char* city = "YourCity";
 const char* countryCode = "DE";
 
 // THE DEFAULT TIMER IS SET TO 10 SECONDS FOR TESTING PURPOSES
@@ -64,7 +64,7 @@ const char* countryCode = "DE";
 unsigned long lastTime = 0;
 // Timer set to 10 minutes (600000)
 //unsigned long timerDelay = 600000;
-// Set timer to 30 seconds (10000)
+// Set timer to 30 seconds (30000)
 unsigned long timerDelay = 30000;
 
 // JSON object
