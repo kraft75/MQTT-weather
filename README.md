@@ -1,9 +1,8 @@
-This project clarifies the communication procedure in a IoT network via MQTT.
-An ESP32 device functions as a client publisher sending sensor data (temperature, humidity)
-to the broker. It also requests via HTTP weather data from penweathermap.org and sends it additional
-to the broker with a different topic.
-Another ESP32 subscribes the data from the broker
+This project demonstrates the communication process in an IoT network using MQTT. One ESP32 device acts as a client publisher, sending sensor data (temperature and humidity) to the broker. Additionally, it retrieves weather data via HTTP from OpenWeatherMap.org and publishes it to the broker under a different topic.
 
-This project demonstrates the basic principal of an MQTT based network.
+Another ESP32 device subscribes to these data topics from the broker.
 
-It is well commented in order to motivate beginners to copy the code for learning purposes.
+For detailed instructions on how to retrieve data from the internet, please refer to this website:
+Random Nerd Tutorials - ESP32 HTTP GET OpenWeatherMap
+
+This project illustrates the fundamental principles of an MQTT-based network. It is thoroughly commented to encourage beginners to experiment with the code for learning purposes.
